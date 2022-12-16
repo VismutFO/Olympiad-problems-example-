@@ -1,0 +1,318 @@
+#include <cmath>
+#include <vector>
+#include <algorithm>
+
+const long long INF = 1e9 + 7;
+
+double EPS = 1e-5;
+
+bool equals(double a, double b) { return std::fabs(a - b) < EPS; }
+
+// several classes that implement basic geometric shapes
+
+class vector
+{
+public:
+	double x, y;
+	vector() : x(0), y(0) {};
+	vector(double x, double y) : x(x), y(y) {}
+	
+	
+	vector operator+() const { return *this; }
+	vector operator-() const { vector other(-x, -y); return other; }
+
+	vector& operator+=(const vector& other) { x += other.x, y += other.y; return *this; }
+	vector& operator-=(const vector& other) { x -= other.x, y -= other.y; return *this; }
+
+	vector& operator+=(const double k) { x += k, y += k; return *this; }
+	vector& operator-=(const double k) { x -= k, y -= k; return *this; }
+	vector& operator*=(const double k) { x *= k, y *= k; return *this; }
+	vector& operator/=(const double k) { x /= k, y /= k; return *this; }
+
+	double length() const { return sqrt(x * x + y * y); }
+};
+
+vector operator+(const vector& a, const vector& b) { return vector(a.x + b.x, a.y + b.y); }
+vector operator-(const vector& a, const vector& b) { return a + (-b); }
+
+vector operator+(const vector& a, const double k) { return vector(a.x + k, a.y + k); }
+vector operator-(const vector& a, const double k) { return vector(a.x - k, a.y - k); }
+vector operator*(const vector& a, const double k) { return vector(a.x * k, a.y * k); }
+vector operator/(const vector& a, const double k) { return vector(a.x / k, a.y / k); }
+
+vector operator*(const double k, const vector& a) { return vector(a.x * k, a.y * k); }
+
+bool operator==(const vector& a, const vector& b) { return (equals(a.x, b.x) && equals(a.y, b.y)); }
+bool operator!=(const vector& a, const vector& b) { return !(a == b); }
+
+double dot_product(const vector& a, const vector& b) { return a.x * b.x + a.y * b.y; }
+double cross_product(const vector& a, const vector& b) { return a.x * b.y - b.x * a.y; }
+
+bool collinear(const vector& a, const vector& b) { return std::fabs(cross_product(a, b)) < EPS; }
+
+class shape
+{
+protected:
+	enum class type {SHAPE, CIRCLE, POLYGON} currentType;
+	vector _center;
+	double r;
+public:
+	shape() : currentType(type::SHAPE) {}
+	virtual vector center() const = 0;
+	virtual double perimeter() const = 0;
+	virtual double area() const = 0;
+
+	virtual bool operator==(const shape& other) const = 0;
+	virtual bool operator!=(const shape& other) const = 0;
+	virtual bool congruent_to(const shape& other) const = 0;
+
+	virtual void rotate(double angle) = 0;
+	virtual void scale(double coefficient) = 0;
+	virtual void translate(vector transform) = 0;
+
+	const type& getType() const { return currentType; }
+};
+
+class circle : public shape
+{
+	const double pi = 3.14159265358979323846;
+public:
+	circle(vector __center, double _r)
+	{
+		_center = __center;
+		r = _r;
+		currentType = type::CIRCLE;
+	}
+	circle(const circle& other)
+	{
+		_center = other._center;
+		r = other.r;
+	}
+	circle& operator=(const circle& other)
+	{
+		_center = other._center;
+		r = other.r;
+		return *this;
+	}
+	double radius() const { return r; }
+	virtual vector center() const override { return _center; }
+	virtual double perimeter() const override { return r * pi * 2.; }
+	virtual double area() const override { return r * r * pi; }
+	virtual bool operator==(const shape& other) const override
+	{
+
+		if (currentType != other.getType()) { return false; }
+		const circle temp(dynamic_cast<const circle&>(other));
+		return (equals(r, temp.r) && _center == temp._center);
+	}
+	virtual bool operator!=(const shape& other) const override { return !(*this == other); }
+
+	virtual bool congruent_to(const shape& other) const override { return (currentType == other.getType() && equals(r, dynamic_cast<const circle&>(other).radius())); }
+
+	virtual void rotate(double angle) override { return; }
+	virtual void scale(double coefficient) override { r *= std::fabs(coefficient); }
+	virtual void translate(vector transform) override { _center += transform; }
+};
+
+class polygon : public shape
+{
+protected:
+	std::vector<vector> _vertices;
+	vector _center;
+	int _n;
+public:
+	polygon(const std::vector<vector>& __vertices) : _vertices(__vertices)
+	{
+		currentType = type::POLYGON;
+		_n = _vertices.size();
+		double ans = 0.;
+		for (int i = 0; i < _n; i++)
+		{
+			double temp = cross_product(_vertices[(i + 1) % _n], _vertices[i]);
+			ans += temp;
+			_center += vector((_vertices[i].x + _vertices[(i + 1) % _n].x) / 3., (_vertices[i].y + _vertices[(i + 1) % _n].y) / 3.) * temp;
+		}
+		_center /= ans;
+		if (ans > 0.) { std::reverse(_vertices.begin(), _vertices.end()); }
+	}
+	polygon(const polygon& other) : _vertices(other._vertices), _n(other._n), _center(other._center) { currentType = type::POLYGON; }
+	int vertices_count() const { return _n; }
+	const std::vector<vector>& get_vertices() const { return _vertices; }
+	virtual vector center() const override { return _center; }
+	virtual double perimeter() const override
+	{
+		double ans = 0.;
+		for (int i = 0; i < _n; i++) { ans += (_vertices[(i + 1) % _n] - _vertices[i]).length(); }
+		return ans;
+	}
+	virtual double area() const override
+	{
+		double ans = 0.;
+		for (int i = 0; i < _n; i++) { ans += cross_product(_vertices[(i + 1) % _n], _vertices[i]) * 0.5; }
+		return fabs(ans);
+	}
+	virtual bool operator==(const shape& other) const override
+	{
+		if (currentType != other.getType()) { return false; }
+		const polygon temp(dynamic_cast<const polygon&>(other));
+		if (_n != temp._n) { return false; }
+		if (_center != temp._center) { return false; }
+		int i = 0;
+		for (; i < _n; i++) { if (_vertices[0] == temp._vertices[i]) { break; } }
+		if (i == _n) { return false; }
+		for (int j = 1; j < _n; j++) { if (_vertices[j] != temp._vertices[(i + j) % _n]) { return false; } }
+		return true;
+	}
+	virtual bool operator!=(const shape& other) const override { return !(*this == other); }
+
+	virtual bool congruent_to(const shape& other) const override
+	{
+		if (currentType != other.getType()) { return false; }
+		const polygon temp(dynamic_cast<const polygon&>(other));
+		if (_n != temp._n) { return false; }
+
+		for (int j = 0; j < _n; j++)
+		{
+			bool res = true;
+			for (int i = 0; i < _n; i++)
+			{
+				double first = (_vertices[(i + 1) % _n] - _vertices[i]).length(),
+					second = (temp._vertices[(i + j + 1) % _n] - temp._vertices[(i + j) % _n]).length();
+				if (!equals(first, second))
+				{
+					res = false;
+					break;
+				}
+				first = cross_product(_vertices[(i + 2) % _n] - _vertices[(i + 1) % _n], _vertices[(i + 1) % _n] - _vertices[(i - 0 + _n) % _n]);
+				second = cross_product(temp._vertices[(i + j + 2) % _n] - temp._vertices[(i + j + 1) % _n], 
+					temp._vertices[(i + j + 1) % _n] - temp._vertices[(i + j - 0 + _n) % _n]);
+				EPS *= 50.;
+				if (!equals(first, second))
+				{
+					EPS /= 50.;
+					res = false;
+					break;
+				}
+				EPS /= 50.;
+			}
+			if (res) { return true; }
+		}
+		
+		for (int j = 0; j < _n; j++)
+		{
+			bool res = true;
+			for (int i = 0; i < _n; i++)
+			{
+				double first = (_vertices[(_n - i) % _n] - _vertices[_n - i - 1]).length(),
+					second = (temp._vertices[(i + j + 1) % _n] - temp._vertices[(i + j) % _n]).length();
+				if (!equals(first, second))
+				{
+					res = false;
+					break;
+				}
+				first = cross_product(_vertices[(_n - i + 1) % _n] - _vertices[(_n - i - 0) % _n], _vertices[(_n - i - 0) % _n] - _vertices[(_n - i - 1 + _n) % _n]);
+				second = cross_product(temp._vertices[(i + j + 1) % _n] - temp._vertices[(i + j) % _n],
+					temp._vertices[(i + j) % _n] - temp._vertices[(i + j - 1 + _n) % _n]);
+				EPS *= 50.;
+				if (!equals(first, second))
+				{
+					EPS /= 50.;
+					res = false;
+					break;
+				}
+				EPS /= 50.;
+			}
+			if (res) { return true; }
+		}
+		return false;
+	}
+
+	virtual void rotate(double angle) override
+	{
+		for (int i = 0; i < _n; i++)
+		{
+			double xTemp = _vertices[i].x - _center.x;
+			double yTemp = _vertices[i].y - _center.y;
+			_vertices[i].x = _center.x + (xTemp * cos(angle) - yTemp * sin(angle));
+			_vertices[i].y = _center.y + (xTemp * sin(angle) + yTemp * cos(angle));
+		}
+	}
+	virtual void scale(double coefficient) override { for (int i = 0; i < _n; i++) { _vertices[i] += (_vertices[i] - _center) * (coefficient - 1.); } }
+	virtual void translate(vector transform) override
+	{
+		_center += transform;
+		for (int i = 0; i < _n; i++) { _vertices[i] += transform; }
+	}
+};
+
+class rectangle : public polygon
+{
+protected:
+	double _width, _height;
+public:
+	rectangle(vector __center, double __height, double __width) : _width(__width), _height(__height),
+		polygon({ vector(__center.x - __width / 2., __center.y - __height / 2.), vector(__center.x - __width / 2., __center.y + __height / 2.),
+			vector(__center.x + __width / 2., __center.y + __height / 2.), vector(__center.x + __width / 2., __center.y - __height / 2.) }) {}
+	double height() const { return _height; }
+	double width() const { return _width; }
+	virtual void scale(double coefficient) override
+	{
+		for (int i = 0; i < _n; i++) { _vertices[i] += (_vertices[i] - _center) * (coefficient - 1.); }
+		_width *= coefficient;
+		_height *= coefficient;
+	}
+};
+class square : public rectangle
+{
+public:
+	square(vector __center, double size) : rectangle(__center, size, size) {}
+	double side() const { return _width; }
+	circle circumscribed_circle() const { return circle(_center, _width / sqrt(2.)); }
+	circle inscribed_circle() const { return circle(_center, _width / 2.); }
+};
+
+vector intersect(vector p1, vector v1, vector p2, vector v2)
+{
+	double temp = (cross_product(p2, v2) - cross_product(p1, v2)) / (cross_product(v1, v2));
+	return vector(p1.x + v1.x * temp, p1.y + v1.y * temp);
+}
+
+class triangle : public polygon
+{
+public:
+	triangle(vector f, vector s, vector t) : polygon({ f, s, t }) {}
+	circle circumscribed_circle() const
+	{
+		double r = (_vertices[0] - _vertices[1]).length();
+		r *= (_vertices[0] - _vertices[2]).length();
+		r *= (_vertices[1] - _vertices[2]).length();
+		r /= area() * 4.;
+
+		vector AB = _vertices[1] - _vertices[0], AC = _vertices[2] - _vertices[0];
+		
+		std::swap(AB.x, AB.y);
+		AB.x *= -1.;
+
+		std::swap(AC.x, AC.y);
+		AC.x *= -1.;
+
+		vector ABMid = (_vertices[0] + _vertices[1]) / 2.;
+		vector ACMid = (_vertices[0] + _vertices[2]) / 2.;
+
+		return circle(intersect(ABMid, AB, ACMid, AC), r);
+	}
+	circle inscribed_circle() const
+	{
+		vector AB = _vertices[1] - _vertices[0], AC = _vertices[2] - _vertices[0];
+		AB /= AB.length();
+		AC /= AC.length();
+		vector bisA = AB + AC;
+
+		vector BA = _vertices[0] - _vertices[1], BC = _vertices[2] - _vertices[1];
+		BA /= BA.length();
+		BC /= BC.length();
+		vector bisB = BA + BC;
+
+		return circle(intersect(_vertices[0], bisA, _vertices[1], bisB), area() * 2. / perimeter());
+	}
+};
