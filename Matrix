@@ -1,0 +1,334 @@
+#include <algorithm>
+#include <stdexcept>
+#include <string>
+
+
+// class, used later to calculate the determinant of matrix
+template <size_t n>
+class permutation
+{
+    unsigned int* arr;
+public:
+    permutation()
+    {
+        arr = new unsigned int[n];
+        for (int i = 0; i < n; i++) { arr[i] = i; }
+    }
+    permutation(const unsigned int* _arr)
+    {
+        arr = new unsigned int[n];
+        for (int i = 0; i < n; i++) { arr[i] = _arr[i]; }
+    }
+    permutation(const permutation& a)
+    {
+        arr = new unsigned int[n];
+        for (int i = 0; i < n; i++) { arr[i] = a.arr[i]; }
+    }
+
+    permutation& operator=(const permutation& other)
+    {
+        arr = other.arr;
+        return *this;
+    }
+    const unsigned int& operator[](const unsigned int index) const
+    {
+        if (index < 0 || index >= n) { throw("ERROR"); }
+        return arr[index];
+    }
+
+    bool operator==(const permutation& other) const
+    {
+        for (int i = 0; i < n; i++) { if (arr[i] != other.arr[i]) { return false; } }
+        return true;
+    }
+    bool operator!=(const permutation& other) const { return !(*this == other); }
+    bool operator<(const permutation& other) const
+    {
+        for (int i = 0; i < n; i++)
+        {
+            if (arr[i] == other.arr[i]) { continue; }
+            return arr[i] < other.arr[i];
+        }
+        return false;
+    }
+    bool operator>(const permutation& other) const { return other < *this; }
+    bool operator>=(const permutation& other) const { return !(*this < other); }
+    bool operator<=(const permutation& other) const { return !(*this > other); }
+
+    void operator()(unsigned int* a) const
+    {
+        unsigned int* temp = new unsigned int[n];
+        for (int i = 0; i < n; i++) { temp[i] = a[i]; }
+        for (int i = 0; i < n; i++) { a[arr[i]] = temp[i]; }
+        delete[] temp;
+    }
+    permutation& operator*=(const permutation& other)
+    {
+        unsigned int* temp = new unsigned int[n];
+        for (int i = 0; i < n; i++) { temp[i] = arr[i]; }
+        for (int i = 0; i < n; i++) { arr[i] = temp[other.arr[i]]; }
+        delete[] temp;
+        return *this;
+    }
+    permutation operator*(const permutation& other) const {
+        permutation<n> temp = *this;
+        temp *= other;
+        return temp;
+    }
+    permutation inverse() const {
+        unsigned int* temp = new unsigned int[n];
+        for (int i = 0; i < n; i++) { temp[arr[i]] = i; }
+        permutation q(temp);
+        delete[] temp;
+        return q;
+    }
+    permutation next() const
+    {
+        if (n == 1) { return *this; }
+        int i = n - 1;
+        while (arr[i - 1] >= arr[i]) { if (--i == 0) { return permutation<n>(); } }
+
+        int j = n - 1;
+        while (j > i && arr[j] <= arr[i - 1]) { j--; }
+
+        permutation ans(*this);
+
+        std::swap(ans.arr[i - 1], ans.arr[j]);
+
+        for (int j = i; j < i + (n - i) / 2; j++) { std::swap(ans.arr[j], ans.arr[n - (j - i) - 1]); }
+
+        return ans;
+    }
+
+    permutation prev() const
+    {
+        if (n == 1) { return *this; }
+        int i = n - 1;
+        while (arr[i - 1] <= arr[i])
+        {
+            if (--i == 0)
+            {
+                unsigned int* temp = new unsigned int[n];
+                for (int i = 0; i < n; i++) { temp[i] = n - i - 1; }
+                return permutation<n>(temp);
+            }
+        }
+
+        int j = n - 1;
+        while (j > i && arr[j] >= arr[i - 1]) { j--; }
+
+        permutation ans(*this);
+
+        std::swap(ans.arr[i - 1], ans.arr[j]);
+
+        for (int j = i; j < i + (n - i) / 2; j++) { std::swap(ans.arr[j], ans.arr[n - (j - i) - 1]); }
+
+        return ans;
+    }
+
+    permutation& operator++()
+    {
+        *this = next();
+        return *this;
+    }
+    const permutation operator++(int temp)
+    {
+        permutation q(*this);
+        *this = next();
+        return q;
+    }
+    permutation& operator--()
+    {
+        *this = prev();
+        return *this;
+    }
+    const permutation operator--(int temp)
+    {
+        permutation q(*this);
+        *this = prev();
+        return q;
+    }
+
+    int sign() const
+    {
+        int ans = 0;
+        for (int i = 0; i < n; i++)
+        {
+            for (int j = i + 1; j < n; j++)
+            {
+                if (arr[i] > arr[j]) { ans++; }
+            }
+        }
+        return (ans % 2 == 0 ? 1 : -1);
+    }
+};
+
+// matrix class, implements all basic operations
+
+template <typename vt, size_t height, size_t width>
+class matrix
+{
+    vt** arr;
+    size_t n, m;
+public:
+    matrix() : n(height), m(width), arr(nullptr)
+    {
+        if (n == 0 || m == 0) { return; }
+        arr = new vt * [n];
+        for (int i = 0; i < n; i++)
+        {
+            arr[i] = new vt[m];
+            for (int j = 0; j < m; j++) { arr[i][j] = 0; }
+        }
+    }
+    matrix(const vt& num) : n(height), m(width)
+    {
+        arr = new vt * [n];
+        for (int i = 0; i < n; i++)
+        {
+            arr[i] = new vt[m];
+            for (int j = 0; j < m; j++) { arr[i][j] = num; }
+        }
+    }
+    matrix(const matrix& a) : n(a.n), m(a.m)
+    {
+        arr = new vt * [n];
+        for (int i = 0; i < n; i++)
+        {
+            arr[i] = new vt[m];
+            for (int j = 0; j < m; j++) { arr[i][j] = a.arr[i][j]; }
+        }
+    }
+    ~matrix()
+    {
+        for (int i = 0; i < n; i++) { delete[] arr[i]; }
+        delete[] arr;
+    }
+
+    matrix& operator=(const matrix& other)
+    {
+        arr = new vt * [n];
+        for (int i = 0; i < n; i++)
+        {
+            arr[i] = new vt[m];
+            for (int j = 0; j < m; j++) { arr[i][j] = other.arr[i][j]; }
+        }
+        return *this;
+    }
+
+    vt& at(const size_t& i, const size_t& j) { return arr[i][j]; }
+    const vt& at(const size_t& i, const size_t& j) const { return arr[i][j]; }
+
+    const matrix operator+() const
+    {
+        matrix temp = *this;
+        return temp;
+    }
+    const matrix operator-() const
+    {
+        matrix temp = *this;
+        for (int i = 0; i < n; i++) { for (int j = 0; j < m; j++) { temp.arr[i][j] *= -1; } }
+        return temp;
+    }
+
+    matrix& operator+=(const matrix& other)
+    {
+        for (int i = 0; i < n; i++) { for (int j = 0; j < m; j++) { arr[i][j] += other.arr[i][j]; } }
+        return *this;
+    }
+    matrix operator+(const matrix& other) const
+    {
+        matrix temp(*this);
+        temp += other;
+        return temp;
+    }
+
+    matrix& operator-=(const matrix& other) { return *this += (-other); }
+    matrix operator-(const matrix& other) const
+    {
+        matrix temp(*this);
+        temp -= other;
+        return temp;
+    }
+
+    bool operator==(const matrix& other) const
+    {
+        for (int i = 0; i < n; i++) { for (int j = 0; j < m; j++) { if (arr[i][j] != other.arr[i][j]) { return false; } } }
+        return true;
+    }
+    bool operator!=(const matrix& other) const { return !(*this == other); }
+
+    matrix& operator*=(const matrix<vt, width, width>& other)
+    {
+        matrix temp = (*this) * other;
+        this->~matrix();
+        *this = temp;
+        return *this;
+    }
+
+    template <size_t height2, size_t width2>
+    matrix<vt, height, width2> operator*(const matrix<vt, height2, width2>& other) const
+    {
+        matrix<vt, height, width2> ans;
+        if (width != height2) { throw("ERROR"); }
+        for (int i = 0; i < height; i++)
+        {
+            for (int j = 0; j < width2; j++)
+            {
+                for (int k = 0; k < width; k++)
+                {
+                    ans.at(i, j) += arr[i][k] * other.at(k, j);
+                }
+            }
+        }
+        
+        return ans;
+    }
+
+    matrix& operator*=(const vt& other)
+    {
+        for (int i = 0; i < n; i++) { for (int j = 0; j < m; j++) { arr[i][j] *= other; } }
+        return *this;
+    }
+    matrix operator*(const vt& other) const
+    {
+        matrix temp = *this;
+        temp *= other;
+        return temp;
+    }
+
+    matrix<vt, width, height> transposed() const
+    {
+        matrix<vt, width, height> ans;
+        for (int i = 0; i < n; i++) { for (int j = 0; j < m; j++) { ans.at(j, i) = arr[i][j]; } }
+        return ans;
+    }
+    vt trace() const
+    {
+        if (height != width) { throw("ERROR"); }
+        vt ans = 0;
+        for (int i = 0; i < n; i++) { ans += arr[i][i]; }
+        return ans;
+    }
+    vt det() const
+    {
+        if (height != width) { throw("ERROR"); }
+        permutation<height> perm, end;
+        vt ans = 0, temp;
+        do
+        {
+            temp = 1;
+            for (int i = 0; i < n; i++) { temp *= arr[i][perm[i]]; }
+            if (temp != 0) { temp *= perm.sign(); }
+            ans += temp;
+            ++perm;
+        } while (perm != end);
+        return ans;
+    }
+};
+template <typename vt, size_t height, size_t width>
+matrix<vt, height, width> operator+(const vt a, const matrix<vt, height, width>& b) { return (b + a); }
+template <typename vt, size_t height, size_t width>
+matrix<vt, height, width> operator-(const vt a, const matrix<vt, height, width>& b) { return -(b - a); }
+template <typename vt, size_t height, size_t width>
+matrix<vt, height, width> operator*(const vt a, const matrix<vt, height, width>& b) { return (b * a); }
