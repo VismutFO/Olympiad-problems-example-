@@ -1,0 +1,41 @@
+#include <type_traits>
+#include <utility>
+
+template<typename vt>
+class smart_ptr
+{
+	vt* _ptr;
+public:
+	smart_ptr() noexcept(std::is_nothrow_default_constructible_v<vt>)
+	{
+		_ptr = (vt*)operator new (sizeof(vt), std::nothrow);
+		new (_ptr) vt();
+	}
+	~smart_ptr() noexcept(std::is_nothrow_destructible_v<vt>)
+	{
+        if(_ptr == nullptr) { return; }
+		(_ptr)->~vt();
+		operator delete(_ptr, std::nothrow);
+	    _ptr = nullptr;
+	}
+	smart_ptr(const smart_ptr& other) = delete;
+	smart_ptr& operator =(const smart_ptr& other) = delete;
+
+	smart_ptr(smart_ptr&& other) noexcept
+	{
+		_ptr = std::move(other._ptr);
+    	other._ptr = nullptr;
+	}
+	smart_ptr& operator =(smart_ptr&& other) noexcept(std::is_nothrow_destructible_v<vt>)
+	{
+		if (this == &other) { return *this; }
+		(_ptr)->~vt();
+		operator delete(_ptr, std::nothrow);
+    	_ptr = std::move(other._ptr);
+  		other._ptr = nullptr;
+	}
+
+	vt* get() const noexcept { return _ptr; }
+	vt* operator->() const noexcept { return _ptr; }
+	vt& operator*() const noexcept { return *(_ptr); }
+};
